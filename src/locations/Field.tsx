@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { TextInput, Button, FormControl, Flex, Box, Caption } from '@contentful/f36-components';
+import { Paragraph, TextInput, Button, FormControl, Flex, Box, Caption, Switch } from '@contentful/f36-components';
 import { FieldAppSDK } from '@contentful/app-sdk';
 import { useSDK } from '@contentful/react-apps-toolkit';
 
@@ -7,6 +7,9 @@ const Field = () => {
   const sdk = useSDK<FieldAppSDK>();
   const cma = sdk.cma;
   const fieldLocale = sdk.field.locale;
+  //type FieldType = "Symbol" | "Text" | "RichText" | "Number" | "Integer" | "Array" | "Link" | "Object" | "Date" | "Location" | "Boolean"
+  const fieldType = sdk.field.type //Exclude<FieldType, 'Array' | 'Link'>;
+  console.log(fieldType)
   // Get the Entry details
   // Content Model
   // console.log(`Entry: ${JSON.stringify(sdk.entry)}`)
@@ -21,7 +24,7 @@ const Field = () => {
   // console.log(`Entry: ${JSON.stringify(sdk.entry.fields['selfRef'])}`);
 
   const [originalValue, setOriginalValue] = useState(sdk.field.getValue());
-  const [commonValue, setCommonValue] = useState('');
+  const [commonValue, setCommonValue] = useState<boolean | string | undefined>();
   const [hasSelfRef, setHasSelfRef] = useState(false);
   const [refId, setRefId] = useState();
 
@@ -80,17 +83,42 @@ const Field = () => {
   // reuse Contentful's editor components
   // -> https://www.contentful.com/developers/docs/extensibility/field-editors/
 
-  const unSetOriginalValue = (event) => {
+  const unSetOriginalValue = () => {
     setOriginalValue(commonValue)
   }
 
-  const onOriginalValueChanged = (event) => {
+  const onOriginalValueChanged = (event: { target: { value: any; }; }) => {
     const val = event.target.value
     setOriginalValue(val.trim() === '' ? commonValue : val)
   }
 
   if (hasSelfRef) {
-    return (
+    if (fieldType === 'Symbol') {
+      return (
+        <>
+          <FormControl>
+            <FormControl.Label>Overwritten value</FormControl.Label>
+            <Flex flexDirection="row" gap="spacingS">
+              <Flex
+                flexGrow={1}
+              >
+                <TextInput value={originalValue} onChange={onOriginalValueChanged} />
+              </Flex>
+              <Box>
+                <Button variant="positive" onClick={unSetOriginalValue} isDisabled={commonValue === originalValue}>Unset</Button>
+              </Box>
+            </Flex>
+            <Caption>If empty, it will take Shared value = '{commonValue}'</Caption>
+          </FormControl>
+          <FormControl>
+            <FormControl.Label>Shared value</FormControl.Label>
+            <TextInput isDisabled value={commonValue} />
+          </FormControl>
+        </>
+      )
+    }
+    else if (fieldType === 'Boolean') {
+      return (
       <>
         <FormControl>
           <FormControl.Label>Overwritten value</FormControl.Label>
@@ -98,25 +126,54 @@ const Field = () => {
             <Flex
               flexGrow={1}
             >
-              <TextInput value={originalValue} onChange={onOriginalValueChanged}/>
+              <Switch
+                isChecked={originalValue}
+                size='medium'
+                onChange={() => setOriginalValue((prevState: boolean) => !prevState)}
+              >
+                {sdk.field.name}
+              </Switch>
             </Flex>
             <Box>
               <Button variant="positive" onClick={unSetOriginalValue} isDisabled={commonValue === originalValue}>Unset</Button>
             </Box>
           </Flex>
-          <Caption>If empty, it will take Shared value = '{commonValue}'</Caption>
+          <Caption>If empty, it will take Shared value = '{commonValue ? 'true' : 'false'}'</Caption>
         </FormControl>
         <FormControl>
           <FormControl.Label>Shared value</FormControl.Label>
-          <TextInput isDisabled value={commonValue} />
+          <Switch
+            isDisabled
+            size='medium'
+            isChecked={commonValue}
+          >
+            {sdk.field.name}
+          </Switch>
         </FormControl>
-      </>
-    )
+        </>
+      )
+    } else {
+      return <Paragraph>No supported question type</Paragraph>
+    }
   }
 
-  return (
-    <TextInput value={originalValue} onChange={(e) => setOriginalValue(e.target.value)}/>
-  )
+  if (fieldType === 'Symbol') {
+    return (
+      <TextInput value={originalValue} onChange={(e) => setOriginalValue(e.target.value)} />
+    )
+  } else if (fieldType === 'Boolean') {
+    return (
+    <Switch
+      isChecked={originalValue}
+      size='medium'
+      onChange={() => setOriginalValue((prevState: boolean) => !prevState)}
+    >
+      {sdk.field.name}
+      </Switch>
+    )
+  } else {
+    return <Paragraph>No supported question type</Paragraph>
+  }
 };
 
 export default Field;
