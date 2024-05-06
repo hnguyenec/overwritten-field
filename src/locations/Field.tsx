@@ -9,7 +9,7 @@ const Field = () => {
   const fieldLocale = sdk.field.locale;
   //type FieldType = "Symbol" | "Text" | "RichText" | "Number" | "Integer" | "Array" | "Link" | "Object" | "Date" | "Location" | "Boolean"
   const fieldType = sdk.field.type //Exclude<FieldType, 'Array' | 'Link'>;
-  console.log(fieldType)
+  // console.log(fieldType)
   // Get the Entry details
   // Content Model
   // console.log(`Entry: ${JSON.stringify(sdk.entry)}`)
