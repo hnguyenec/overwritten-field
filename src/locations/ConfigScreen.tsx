@@ -9,7 +9,7 @@ type TagProps = {
   name: string;
 };
 
-interface IRemotedAppUrl {
+export interface IRemotedAppUrl {
   brand: string;
   product: string;
   url: string;

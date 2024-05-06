@@ -1,12 +1,17 @@
 import React, { useEffect, useState } from 'react';
-import { Paragraph, TextInput, Button, FormControl, Flex, Box, Caption, Switch } from '@contentful/f36-components';
+import { Paragraph, TextInput, Button, FormControl, Flex, Box, Caption, Switch, Select  } from '@contentful/f36-components';
 import { FieldAppSDK } from '@contentful/app-sdk';
 import { useSDK } from '@contentful/react-apps-toolkit';
+import { AppInstallationParameters } from './ConfigScreen';
 
 const Field = () => {
   const sdk = useSDK<FieldAppSDK>();
   const cma = sdk.cma;
   const fieldLocale = sdk.field.locale;
+  const installationParameters = sdk.parameters.installation as AppInstallationParameters; // From App Config (ConfigScreen)
+  const instanceParameters = sdk.parameters.instance; // From App Definition
+  const isFieldReliedOnInstallationParams = instanceParameters?.usingInstallationParameters ?? false;
+
   //type FieldType = "Symbol" | "Text" | "RichText" | "Number" | "Integer" | "Array" | "Link" | "Object" | "Date" | "Location" | "Boolean"
   const fieldType = sdk.field.type //Exclude<FieldType, 'Array' | 'Link'>;
   // console.log(fieldType)
@@ -18,8 +23,20 @@ const Field = () => {
   // const spaceId = sdk.entry.getSys().space.sys.id;
   // const space = cma.space.get({ spaceId: spaceId })
   //    .then((_space) => console.log(_space));
-  // const entryId = sdk.entry.getSys().id;
-
+  const entryTags = sdk.entry.getMetadata()?.tags;
+  const currentEntryBrandTags = entryTags?.filter(item => item.sys.id.toLowerCase().startsWith('brand')).map(item => item.sys.id) ?? [];
+  const currentEntryProductTags = entryTags?.filter(item => item.sys.id.toLowerCase().startsWith('product')).map(item => item.sys.id) ?? [];
+  const shouldRenderSelection = !(currentEntryBrandTags?.length === 1 && currentEntryProductTags?.length === 1);
+  const selectionData = []
+  if (shouldRenderSelection) {
+    for (const [key, value] of Object.entries(installationParameters)) {
+      if (currentEntryBrandTags.includes(value.brand) || currentEntryProductTags.includes(value.product)) {
+        selectionData.push(value)
+      }
+    }
+  } else {
+    selectionData.push(installationParameters[`${currentEntryBrandTags[0]}-${currentEntryProductTags[0]}`])
+  }
   // Getting individual fields of the Entry
   // console.log(`Entry: ${JSON.stringify(sdk.entry.fields['selfRef'])}`);
 
@@ -159,7 +176,30 @@ const Field = () => {
 
   if (fieldType === 'Symbol') {
     return (
-      <TextInput value={originalValue} onChange={(e) => setOriginalValue(e.target.value)} />
+    <>
+        { !isFieldReliedOnInstallationParams ?
+          <TextInput value={originalValue} onChange={(e) => setOriginalValue(e.target.value)} /> :
+          <>
+            {
+              shouldRenderSelection ?
+                <>
+                  <Select
+                    value={originalValue}
+                    onChange={(e) => setOriginalValue(e.target.value)}
+                  >
+                      {
+                        selectionData.map((item, index) => {
+                          return <Select.Option key={item.id} value={item.url}>{item.url}</Select.Option>
+                        })
+                      }
+                  </Select>
+                </>
+                :
+                <Paragraph>{JSON.stringify(selectionData)}</Paragraph>
+            }
+          </>
+        }
+        </>
     )
   } else if (fieldType === 'Boolean') {
     return (
