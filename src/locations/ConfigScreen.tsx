@@ -1,6 +1,6 @@
 import React, { useCallback, useState, useEffect } from 'react';
 import { ConfigAppSDK } from '@contentful/app-sdk';
-import { Heading, Form, Paragraph, Flex, DisplayText, Note, FormControl, TextInput, Select, Table } from '@contentful/f36-components';
+import { Heading, Form, Paragraph, Flex, DisplayText, Note, FormControl, TextInput, Button, Table } from '@contentful/f36-components';
 import { css } from 'emotion';
 import { useSDK } from '@contentful/react-apps-toolkit';
 
@@ -9,7 +9,15 @@ type TagProps = {
   name: string;
 };
 
-export interface AppInstallationParameters { }
+interface IRemotedAppUrl {
+  brand: string;
+  product: string;
+  url: string;
+  id: string;
+}
+export interface AppInstallationParameters {
+  [brandProductTag: string]: IRemotedAppUrl;
+ }
 
 const ConfigScreen = () => {
   const [parameters, setParameters] = useState<AppInstallationParameters>({});
@@ -19,13 +27,6 @@ const ConfigScreen = () => {
   const [spaceId, setSpaceId] = useState<string | undefined>()
   const [brandTags, setBrandTags] = useState<TagProps[]>()
   const [productTags, setProductTags] = useState<TagProps[]>()
-
-  const [selectedBrand, setSelectedBrand] = useState();
-  const [selectedProduct, setSelectedProduct] = useState();
-
-  const handleOnBrandSelectedChange = (event) => setSelectedBrand(event.target.value);
-  const handleOnProductSelectedChange = (event) => setSelectedProduct(event.target.value);
-
 
   useEffect(() => {
     cma.space.get({})
@@ -93,8 +94,22 @@ const ConfigScreen = () => {
     })();
   }, [sdk]);
 
+  const onUrlInputChanged = (event) => {
+    const target = event.target;
+
+    const formItems: IRemotedAppUrl = {
+      id: target.id,
+      url: target.value,
+      brand: target.id.split('-')[0],
+      product: target.id.split('-')[1]
+    }
+    setParameters({
+      ...parameters,
+      [target.id]: formItems
+    })
+  }
   return (
-    <Flex flexDirection="column" className={css({ margin: '80px', maxWidth: '800px' })} gap="spacingS">
+    <Flex flexDirection="column" className={css({ margin: '80px' })} gap="spacingS">
       <DisplayText>This settings are applied to: {currentEnvironment.toLowerCase() === 'master' ? 'PRODUCTION' : currentEnvironment.toUpperCase()} environment</DisplayText>
       <Note variant="warning" title="This app requires the tags to be created in the space. The tags should be named as follows:">
         <Paragraph>
@@ -109,7 +124,7 @@ const ConfigScreen = () => {
         <Table>
           <Table.Head>
             <Table.Row>
-              <Table.Cell>URL</Table.Cell>
+              <Table.Cell>URL (Required)</Table.Cell>
               <Table.Cell>Brand</Table.Cell>
               <Table.Cell>Product</Table.Cell>
             </Table.Row>
@@ -122,14 +137,20 @@ const ConfigScreen = () => {
                     return (
                       <Table.Row key={brand.sys.id + product.sys.id}>
                         <Table.Cell>
-                          <FormControl>
-                            <FormControl.Label isRequired>URL</FormControl.Label>
-                            <TextInput />
+                          <FormControl isRequired>
+                            <TextInput
+                              value={parameters[`${brand.sys.id}-${product.sys.id}`].url ?? ''}
+                              name={`${brand.sys.id}-${product.sys.id}`} id={`${brand.sys.id}-${product.sys.id}`}
+                              onChange={onUrlInputChanged} />
                             <FormControl.HelpText>Enter the remoted app url for each Brand and Product</FormControl.HelpText>
                           </FormControl>
                         </Table.Cell>
-                        <Table.Cell>{brand.name.replace('Brand:', '')}</Table.Cell>
-                        <Table.Cell>{product.name.replace('Product:', '')}</Table.Cell>
+                        <Table.Cell>
+                            <DisplayText>{ brand.name.replace('Brand:', '') }</DisplayText>
+                        </Table.Cell>
+                        <Table.Cell>
+                          <DisplayText>{ product.name.replace('Product:', '') }</DisplayText>
+                        </Table.Cell>
                       </Table.Row>
                     )
                   })
