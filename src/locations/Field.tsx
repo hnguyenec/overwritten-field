@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Paragraph, TextInput, Button, FormControl, Flex, Box, Caption, Switch, Select  } from '@contentful/f36-components';
+import { Paragraph, TextInput, Button, FormControl, Flex, Box, Caption, Switch, Select } from '@contentful/f36-components';
 import { FieldAppSDK } from '@contentful/app-sdk';
 import { useSDK } from '@contentful/react-apps-toolkit';
-import { AppInstallationParameters } from './ConfigScreen';
+import { AppInstallationParameters, IRemotedAppUrl } from './ConfigScreen';
 
 const Field = () => {
   const sdk = useSDK<FieldAppSDK>();
@@ -23,31 +23,54 @@ const Field = () => {
   // const spaceId = sdk.entry.getSys().space.sys.id;
   // const space = cma.space.get({ spaceId: spaceId })
   //    .then((_space) => console.log(_space));
-  const entryTags = sdk.entry.getMetadata()?.tags;
-  const currentEntryBrandTags = entryTags?.filter(item => item.sys.id.toLowerCase().startsWith('brand')).map(item => item.sys.id) ?? [];
-  const currentEntryProductTags = entryTags?.filter(item => item.sys.id.toLowerCase().startsWith('product')).map(item => item.sys.id) ?? [];
-  const shouldRenderSelection = !(currentEntryBrandTags?.length === 1 && currentEntryProductTags?.length === 1);
-  const selectionData = []
-  if (shouldRenderSelection) {
-    for (const [key, value] of Object.entries(installationParameters)) {
-      if (currentEntryBrandTags.includes(value.brand) || currentEntryProductTags.includes(value.product)) {
-        selectionData.push(value)
-      }
-    }
-  } else {
-    selectionData.push(installationParameters[`${currentEntryBrandTags[0]}-${currentEntryProductTags[0]}`])
-  }
+
+
   // Getting individual fields of the Entry
   // console.log(`Entry: ${JSON.stringify(sdk.entry.fields['selfRef'])}`);
+
 
   const [originalValue, setOriginalValue] = useState(sdk.field.getValue());
   const [commonValue, setCommonValue] = useState<boolean | string | undefined>();
   const [hasSelfRef, setHasSelfRef] = useState(false);
   const [refId, setRefId] = useState();
+  const [selectionData, setSelectionData] = useState<IRemotedAppUrl[]>([]);
+  const [shouldRenderSelection, setShouldRenderSelection] = useState<boolean>(false);
 
   useEffect(() => {
     sdk.window.startAutoResizer()
   }, [sdk.window])
+
+  useEffect(() => {
+    const entryTags = sdk.entry.getMetadata()?.tags;
+    const _currentEntryBrandTags = entryTags?.filter(item => item.sys.id.toLowerCase().startsWith('brand')).map(item => item.sys.id) ?? [];
+    const _currentEntryProductTags = entryTags?.filter(item => item.sys.id.toLowerCase().startsWith('product')).map(item => item.sys.id) ?? [];
+    const _shouldRenderSelection = !(_currentEntryBrandTags?.length === 1 && _currentEntryProductTags?.length === 1)
+    const _selectionData = [] as IRemotedAppUrl[];
+    setShouldRenderSelection(_shouldRenderSelection);
+
+    if (_shouldRenderSelection) {
+      for (const [key, value] of Object.entries(installationParameters)) {
+        if (_currentEntryBrandTags.includes(value.brand) || _currentEntryProductTags.includes(value.product)) {
+          _selectionData.push(
+            value
+          )
+        }
+      }
+    } else {
+      _selectionData.push(
+        installationParameters[`${_currentEntryBrandTags[0]}-${_currentEntryProductTags[0]}`]
+      )
+    }
+
+    if (!_shouldRenderSelection && isFieldReliedOnInstallationParams) {
+      setOriginalValue(_selectionData[0].url)
+    }
+
+    setSelectionData(
+      _selectionData.filter(item => item.url !== '')
+    )
+  }, [installationParameters, isFieldReliedOnInstallationParams, sdk.entry])
+
 
   useEffect(() => {
     sdk.field.setValue(originalValue)
@@ -58,9 +81,17 @@ const Field = () => {
       cma.entry.get({ entryId: refId }).then(ref => {
         //console.log(`Ref entry: ${JSON.stringify(ref)}`)
         //console.log(`Ref entry {${sdk.field.id}}: ${JSON.stringify(ref.fields[sdk.field.id][fieldLocale])}`)
-        setCommonValue(ref.fields[sdk.field.id][fieldLocale])
+        if (ref.fields[sdk.field.id] && ref.fields[sdk.field.id][fieldLocale]) {
+          setCommonValue(ref.fields[sdk.field.id][fieldLocale])
+        } else {
+          setCommonValue(undefined)
+        }
         if (!sdk.field.getValue()) {
-          setOriginalValue(ref.fields[sdk.field.id][fieldLocale])
+          if (ref.fields[sdk.field.id] && ref.fields[sdk.field.id][fieldLocale]) {
+            setOriginalValue(ref.fields[sdk.field.id][fieldLocale])
+          } else {
+            setOriginalValue(undefined)
+          }
         }
       })
     }
@@ -113,60 +144,113 @@ const Field = () => {
     if (fieldType === 'Symbol') {
       return (
         <>
+          {!isFieldReliedOnInstallationParams ?
+            <>
+              <FormControl>
+                <FormControl.Label>Overwritten value</FormControl.Label>
+                <Flex flexDirection="row" gap="spacingS">
+                  <Flex
+                    flexGrow={1}
+                  >
+                    <TextInput value={originalValue} onChange={onOriginalValueChanged} />
+                  </Flex>
+                  <Box>
+                    <Button variant="positive" onClick={unSetOriginalValue} isDisabled={commonValue === originalValue}>Unset</Button>
+                  </Box>
+                </Flex>
+                <Caption>If empty, it will take Shared value = '{commonValue}'</Caption>
+              </FormControl>
+              <FormControl>
+                <FormControl.Label>Shared value</FormControl.Label>
+                <TextInput isDisabled value={commonValue} />
+              </FormControl>
+            </>
+            :
+            <>
+              <FormControl>
+                <FormControl.Label>Overwritten value</FormControl.Label>
+                <Flex flexDirection="row" gap="spacingS">
+                  <Flex
+                    flexGrow={1}
+                  >
+                    <>
+                      {
+                        shouldRenderSelection ?
+                          <>
+                            <Flex flexDirection="row" gap="spacingS">
+                              <Flex
+                                flexGrow={1}
+                              >
+                                <TextInput value={originalValue} onChange={(e) => setOriginalValue(e.target.value)} />
+                              </Flex>
+                              <Box>
+                                <Select
+                                  onChange={(e) => setOriginalValue(e.target.value)}
+                                >
+                                  {
+                                    selectionData.map((item, index) => {
+                                      return <Select.Option key={item.id} value={item.url}>{item.url}</Select.Option>
+                                    })
+                                  }
+                                </Select>
+                              </Box>
+                            </Flex>
+
+                          </>
+                          :
+                          <TextInput value={originalValue} onChange={(e) => setOriginalValue(e.target.value)} />
+                      }
+                    </>
+                  </Flex>
+                  <Box>
+                    <Button variant="positive" onClick={unSetOriginalValue} isDisabled={commonValue === originalValue}>Unset</Button>
+                  </Box>
+                </Flex>
+                <Caption>If empty, it will take Shared value = '{commonValue}'</Caption>
+              </FormControl>
+              <FormControl>
+                <FormControl.Label>Shared value</FormControl.Label>
+                <TextInput isDisabled value={commonValue} />
+              </FormControl>
+            </>
+
+          }
+        </>
+      )
+    }
+    else if (fieldType === 'Boolean') {
+      return (
+        <>
           <FormControl>
             <FormControl.Label>Overwritten value</FormControl.Label>
             <Flex flexDirection="row" gap="spacingS">
               <Flex
                 flexGrow={1}
               >
-                <TextInput value={originalValue} onChange={onOriginalValueChanged} />
+                <Switch
+                  isChecked={originalValue}
+                  size='medium'
+                  onChange={() => setOriginalValue((prevState: boolean) => !prevState)}
+                >
+                  {sdk.field.name}
+                </Switch>
               </Flex>
               <Box>
                 <Button variant="positive" onClick={unSetOriginalValue} isDisabled={commonValue === originalValue}>Unset</Button>
               </Box>
             </Flex>
-            <Caption>If empty, it will take Shared value = '{commonValue}'</Caption>
+            <Caption>If empty, it will take Shared value = '{commonValue ? 'true' : 'false'}'</Caption>
           </FormControl>
           <FormControl>
             <FormControl.Label>Shared value</FormControl.Label>
-            <TextInput isDisabled value={commonValue} />
-          </FormControl>
-        </>
-      )
-    }
-    else if (fieldType === 'Boolean') {
-      return (
-      <>
-        <FormControl>
-          <FormControl.Label>Overwritten value</FormControl.Label>
-          <Flex flexDirection="row" gap="spacingS">
-            <Flex
-              flexGrow={1}
+            <Switch
+              isDisabled
+              size='medium'
+              isChecked={commonValue}
             >
-              <Switch
-                isChecked={originalValue}
-                size='medium'
-                onChange={() => setOriginalValue((prevState: boolean) => !prevState)}
-              >
-                {sdk.field.name}
-              </Switch>
-            </Flex>
-            <Box>
-              <Button variant="positive" onClick={unSetOriginalValue} isDisabled={commonValue === originalValue}>Unset</Button>
-            </Box>
-          </Flex>
-          <Caption>If empty, it will take Shared value = '{commonValue ? 'true' : 'false'}'</Caption>
-        </FormControl>
-        <FormControl>
-          <FormControl.Label>Shared value</FormControl.Label>
-          <Switch
-            isDisabled
-            size='medium'
-            isChecked={commonValue}
-          >
-            {sdk.field.name}
-          </Switch>
-        </FormControl>
+              {sdk.field.name}
+            </Switch>
+          </FormControl>
         </>
       )
     } else {
@@ -176,39 +260,48 @@ const Field = () => {
 
   if (fieldType === 'Symbol') {
     return (
-    <>
-        { !isFieldReliedOnInstallationParams ?
+      <>
+        {!isFieldReliedOnInstallationParams ?
           <TextInput value={originalValue} onChange={(e) => setOriginalValue(e.target.value)} /> :
           <>
             {
               shouldRenderSelection ?
                 <>
-                  <Select
-                    value={originalValue}
-                    onChange={(e) => setOriginalValue(e.target.value)}
-                  >
-                      {
-                        selectionData.map((item, index) => {
-                          return <Select.Option key={item.id} value={item.url}>{item.url}</Select.Option>
-                        })
-                      }
-                  </Select>
+                  <Flex flexDirection="row" gap="spacingS">
+                    <Flex
+                      flexGrow={1}
+                    >
+                      <TextInput value={originalValue} onChange={(e) => setOriginalValue(e.target.value)} />
+                    </Flex>
+                    <Box>
+                      <Select
+                        onChange={(e) => setOriginalValue(e.target.value)}
+                      >
+                        {
+                          selectionData.map((item, index) => {
+                            return <Select.Option key={item.id} value={item.url}>{item.url}</Select.Option>
+                          })
+                        }
+                      </Select>
+                    </Box>
+                  </Flex>
+
                 </>
                 :
-                <Paragraph>{JSON.stringify(selectionData)}</Paragraph>
+                <TextInput value={originalValue} onChange={(e) => setOriginalValue(e.target.value)} />
             }
           </>
         }
-        </>
+      </>
     )
   } else if (fieldType === 'Boolean') {
     return (
-    <Switch
-      isChecked={originalValue}
-      size='medium'
-      onChange={() => setOriginalValue((prevState: boolean) => !prevState)}
-    >
-      {sdk.field.name}
+      <Switch
+        isChecked={originalValue}
+        size='medium'
+        onChange={() => setOriginalValue((prevState: boolean) => !prevState)}
+      >
+        {sdk.field.name}
       </Switch>
     )
   } else {

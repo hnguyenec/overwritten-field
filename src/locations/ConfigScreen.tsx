@@ -1,6 +1,6 @@
 import React, { useCallback, useState, useEffect } from 'react';
 import { ConfigAppSDK } from '@contentful/app-sdk';
-import { Heading, Form, Paragraph, Flex, DisplayText, Note, FormControl, TextInput, Button, Table } from '@contentful/f36-components';
+import { Heading, Form, Paragraph, Flex, DisplayText, Note, FormControl, TextInput, Table } from '@contentful/f36-components';
 import { css } from 'emotion';
 import { useSDK } from '@contentful/react-apps-toolkit';
 
